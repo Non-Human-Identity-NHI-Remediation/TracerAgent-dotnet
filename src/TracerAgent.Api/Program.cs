@@ -1,44 +1,42 @@
+using TracerAgent-dotnet.TracerAgent.Core.Interfaces;
+using TracerAgent-dotnet.TracerAgent.Core.Services;
+using TracerAgent-dotnet.TracerAgent.Infrastructure.Adapters.AppCatalog;
+using TracerAgent-dotnet.TracerAgent.Infrastructure.Adapters.Ldap;
+using TracerAgent-dotnet.TracerAgent.Infrastructure.Adapters.Siem;
+using TracerAgent-dotnet.TracerAgent.Infrastructure.Queue;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// ── Queue ────────────────────────────────────────────────────
+builder.Services.AddSingleton<InvestigationChannel>();
+builder.Services.AddHostedService<InvestigationWorker>();
+
+// ── Core services ────────────────────────────────────────────
+builder.Services.AddScoped<IActivityVerifier, ActivityVerifier>();
+builder.Services.AddScoped<IContextResolver, ContextResolver>();
+builder.Services.AddScoped<IEnrichmentOrchestrator, EnrichmentOrchestrator>();
+
+// ── Adapters (3 total — locked inventory) ────────────────────
+// Dep 1, Step 1: SIEM (Splunk)
+builder.Services.AddScoped<ISiemAdapter, MockSiemAdapter>();
+// Dep 1, Step 2: OpenLDAP (fallback)
+builder.Services.AddScoped<ILdapAdapter, MockLdapAdapter>();
+// Dep 2: AppCatalog/CMDB
+builder.Services.AddScoped<IAppCatalogAdapter, MockAppCatalogAdapter>();
+
+// NO IGA adapter — IGA is upstream. Accounts arrive pre-classified.
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
-
+app.MapControllers();
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

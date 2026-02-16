@@ -2,8 +2,8 @@ namespace TracerAgent.Infrastructure.Queue;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using TracerAgent.Core.Interfaces;
-using TracerAgent.Core.Models;
+using TracerAgent-dotnet.TracerAgent.Core.Interfaces;
+using TracerAgent-dotnet.TracerAgent.Core.Models;
 
 public sealed class InvestigationWorker : BackgroundService
 {

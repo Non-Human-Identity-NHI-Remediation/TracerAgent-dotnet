@@ -1,7 +1,7 @@
 namespace TracerAgent.Infrastructure.Queue;
 
 using System.Threading.Channels;
-using TracerAgent.Core.Models;
+using TracerAgent-dotnet.TracerAgent.Core.Models;
 
 public sealed class InvestigationChannel
 {
