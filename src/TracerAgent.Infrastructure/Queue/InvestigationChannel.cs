@@ -23,5 +23,6 @@ public sealed class InvestigationChannel
     public IAsyncEnumerable<InvestigationRequest> ReadAllAsync(CancellationToken ct = default)
         => _channel.Reader.ReadAllAsync(ct);
 
+
     public int PendingCount => _channel.Reader.Count;
 }

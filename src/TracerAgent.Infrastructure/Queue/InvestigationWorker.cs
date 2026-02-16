@@ -46,20 +46,23 @@ public sealed class InvestigationWorker : BackgroundService
 
     private Task RouteResultAsync(InvestigationResult result, CancellationToken ct)
     {
+        var tag = result.WasReclassified ? "⚡ RECLASSIFIED" : "✓";
+
+        // Every account goes to Agent B + Agent C. No exceptions.
+        _log.LogInformation(
+            "{Tag} → Agent B (Risk) + Agent C (Outreach): {Id} ({Class}, {Confidence}) — {Goal}",
+            tag, result.AccountId, result.FinalClassification,
+            result.ActivityVerification.Confidence, result.Routing.OutreachGoal);
+
         if (result.WasReclassified)
         {
-            _log.LogInformation(
-                "⚡ {Id}: Reclassified → Active. IGA data gap flagged. Dropped.",
-                result.AccountId);
+            // Also publish IGA data gap event for reconciliation
+            _log.LogWarning(
+                "⚡ IGA Data Gap: {Id} was {Original} in IGA but verified Active by {Source}",
+                result.AccountId, result.AccountData.Classification,
+                result.ActivityVerification.VerifiedBy);
             // TODO: Publish IgaDataGapEvent
-            return Task.CompletedTask;
         }
-
-        // Both Agent B AND Agent C for ALL Stale/Orphaned
-        _log.LogInformation(
-            "→ Agent B (Risk) + Agent C (Outreach): {Id} ({Class}, {Confidence}) — {Goal}",
-            result.AccountId, result.FinalClassification,
-            result.ActivityVerification.Confidence, result.Routing.OutreachGoal);
 
         // TODO: Publish AccountEnrichedEvent to Agent B queue
         // TODO: Publish AccountEnrichedEvent to Agent C queue

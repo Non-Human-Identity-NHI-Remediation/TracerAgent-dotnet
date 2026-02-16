@@ -54,4 +54,5 @@ public class InvestigationController : ControllerBase
         pendingInvestigations = _channel.PendingCount,
         status = "running"
     });
+
 }

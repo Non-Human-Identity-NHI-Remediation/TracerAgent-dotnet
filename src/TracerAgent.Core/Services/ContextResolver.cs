@@ -22,7 +22,7 @@ public sealed class ContextResolver : IContextResolver
         _log = log;
     }
 
-    public async Task<AppContext> ResolveAsync(NHIAccount account, CancellationToken ct = default)
+    public async Task<AppContext> ResolveAsync(NhiAccount account, CancellationToken ct = default)
     {
         _log.LogInformation("Dep2: Resolving context for {Id} → app {AppId}",
             account.AccountId, account.ApplicationId);

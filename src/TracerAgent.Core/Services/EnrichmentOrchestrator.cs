@@ -54,53 +54,31 @@ public sealed class EnrichmentOrchestrator : IEnrichmentOrchestrator
         if (reclassified)
         {
             _log.LogWarning(
-                "⚡ {Id}: RECLASSIFIED → Active. IGA data gap. Dropping from pipeline.",
+                "⚡ {Id}: RECLASSIFIED → Active. IGA data gap. Full pipeline continues.",
                 account.AccountId);
-
-            return new InvestigationResult
-            {
-                AccountId = account.AccountId,
-                RequestId = requestId,
-                AccountData = account,
-                FinalClassification = Classification.Active,
-                WasReclassified = true,
-                ReclassificationReason = reclassReason,
-                ActivityVerification = verification,
-                ApplicationContext = new AppContext
-                {
-                    ApplicationId = account.ApplicationId,
-                    ApplicationName = account.ApplicationName,
-                    Platform = account.Platform,
-                    Status = AppStatus.Active
-                },
-                Routing = new DownstreamRouting
-                {
-                    SendToAgentB = false,
-                    SendToAgentC = false,
-                    OutreachGoal = "N/A — reclassified Active. IGA data gap flagged for reconciliation."
-                },
-                InvestigatedAt = DateTime.UtcNow
-            };
         }
-
-        // ── Confirmed Stale/Orphaned — full pipeline continues ───
-        _log.LogInformation(
-            "{Id}: Confirmed {Class} | {Confidence} confidence | continuing pipeline",
-            account.AccountId, account.Classification, verification.Confidence);
+        else
+        {
+            _log.LogInformation(
+                "{Id}: Confirmed {Class} | {Confidence} confidence | continuing pipeline",
+                account.AccountId, account.Classification, verification.Confidence);
+        }
 
         // ── Dep 2: Context Resolution (AppCatalog) ───────────────
         var appContext = await _contextResolver.ResolveAsync(account, ct);
 
         // ── Build case file + routing ────────────────────────────
-        var routing = BuildRouting(account.Classification);
+        var finalClassification = reclassified ? Classification.Active : account.Classification;
+        var routing = BuildRouting(finalClassification, reclassified);
 
         var result = new InvestigationResult
         {
             AccountId = account.AccountId,
             RequestId = requestId,
             AccountData = account,
-            FinalClassification = account.Classification,
-            WasReclassified = false,
+            FinalClassification = finalClassification,
+            WasReclassified = reclassified,
+            ReclassificationReason = reclassReason,
             ActivityVerification = verification,
             ApplicationContext = appContext,
             Routing = routing,
@@ -166,27 +144,36 @@ public sealed class EnrichmentOrchestrator : IEnrichmentOrchestrator
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Both Stale AND Orphaned → BOTH Agent B + Agent C
+    // ALL accounts route to Agent B + Agent C. No exceptions.
+    // Reclassified accounts get a specific outreach goal about the IGA gap.
     // ─────────────────────────────────────────────────────────────
-    private static DownstreamRouting BuildRouting(Classification classification) => classification switch
-    {
-        Classification.Stale => new DownstreamRouting
+    private static DownstreamRouting BuildRouting(Classification classification, bool wasReclassified) =>
+        (classification, wasReclassified) switch
         {
-            SendToAgentB = true,
-            SendToAgentC = true,
-            OutreachGoal = "Get approval to disable account. Confirm usage details with owner."
-        },
-        Classification.Orphaned => new DownstreamRouting
-        {
-            SendToAgentB = true,
-            SendToAgentC = true,
-            OutreachGoal = "Transfer ownership. Confirm application status and usage with app team."
-        },
-        _ => new DownstreamRouting
-        {
-            SendToAgentB = false,
-            SendToAgentC = false,
-            OutreachGoal = "N/A"
-        }
-    };
+            (Classification.Active, true) => new DownstreamRouting
+            {
+                SendToAgentB = true,
+                SendToAgentC = true,
+                OutreachGoal = "IGA data gap detected — account is active but IGA classified it incorrectly. " +
+                               "Confirm usage with owner. Assess risk of IGA visibility gap."
+            },
+            (Classification.Stale, _) => new DownstreamRouting
+            {
+                SendToAgentB = true,
+                SendToAgentC = true,
+                OutreachGoal = "Get approval to disable account. Confirm usage details with owner."
+            },
+            (Classification.Orphaned, _) => new DownstreamRouting
+            {
+                SendToAgentB = true,
+                SendToAgentC = true,
+                OutreachGoal = "Transfer ownership. Confirm application status and usage with app team."
+            },
+            _ => new DownstreamRouting
+            {
+                SendToAgentB = true,
+                SendToAgentC = true,
+                OutreachGoal = "Review account status."
+            }
+        };
 }

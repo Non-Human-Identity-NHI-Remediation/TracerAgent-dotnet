@@ -32,7 +32,7 @@ public sealed class ActivityVerifier : IActivityVerifier
     }
 
     public async Task<ActivityVerificationResult> VerifyAsync(
-        NHIAccount account, CancellationToken ct = default)
+        NhiAccount account, CancellationToken ct = default)
     {
         var lookbackFrom = DateTime.UtcNow.AddDays(-LookbackDays);
 
